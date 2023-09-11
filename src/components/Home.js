@@ -102,7 +102,7 @@ window.addEventListener('storage', (event) => {
     }
 
     const clientId = '9cf715547e7245ab8b2154081eeab4cf';
-    const redirectUri = 'http://localhost:3000/auth';
+    const redirectUri = 'https://mixes.musixspace.com/auth';
     const scope = [
       'user-read-private user-read-email',
       'playlist-modify-public',
@@ -181,7 +181,7 @@ window.addEventListener('storage', (event) => {
     setCurrentTrack(null);
     axios
       .post(
-        'http://127.0.0.1:5000/',
+        'https://mixes.data.musixspace.com/',
         {
           prompt: prompt,
         },
