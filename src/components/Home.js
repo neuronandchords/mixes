@@ -122,6 +122,29 @@ window.addEventListener('storage', (event) => {
         },
       })
       .then(response => {
+
+        axios
+        .post(
+          `https://mixes.data.musixspace.com/info`,
+          {
+            name: response.data.display_name,
+            id: response.data.id,
+            email: response.data.email || null,
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json', // Specify that the request body is JSON
+              'Access-Control-Allow-Origin': '*',
+            },
+          }
+        )
+        .then(response => {
+          console.log('user info stored');
+        })
+        .catch(err => {
+          console.log('error in fetching data');
+        });
+
         axios
           .post(
             `https://api.spotify.com/v1/users/${response.data.id}/playlists`,
@@ -349,7 +372,7 @@ window.addEventListener('storage', (event) => {
               <Text
                 marginTop={'48px'}
                 marginBottom={'24px'}
-                fontSize={['2xl','2xl','2xl','2xl','2xl']}
+                fontSize={['xl','xl','2xl','2xl','2xl']}
                 fontWeight={'bold'}
                 color="#FFFFFF"
                 display={playlist && playlist.length > 0 ? 'block' : 'none'}
