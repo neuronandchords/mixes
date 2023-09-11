@@ -239,7 +239,7 @@ window.addEventListener('storage', (event) => {
         }}
       />
       <Box bgGradient="linear(to-r,#16032F, #000000)">
-        <Flex wrap={['wrap','wrap','nowrap','nowrap','nowrap']} p={12} gap={48} direction={'row'}>
+        <Flex wrap={['wrap','wrap','nowrap','nowrap','nowrap']} p={[6,6,12]} gap={48} direction={'row'}>
           <Box
             h="100vh"
             overflow={'scroll'}
@@ -259,8 +259,9 @@ window.addEventListener('storage', (event) => {
                   <Input
                     onChange={e => setPrompt(e.target.value)}
                     value={prompt}
-                    _activeLink={{ border: 'transperant' }}
+                    focusBorderColor={'transperant'}
                     border={'transparent'}
+                    borderRadius={48}
                     w={'100%'}
                     fontWeight={'700'}
                     textColor={'#F59C24'}
@@ -382,7 +383,7 @@ window.addEventListener('storage', (event) => {
                   <ModalOverlay backdropFilter="blur(10px)" />
                   <ModalContent
                     width={['100%','100%','50%']}
-                    h={['40%','40%','40%']}
+                    h={['40%','40%','30%']}
                     bgGradient="linear(to-r,#16032F, #000000)"
                   >
                     <ModalCloseButton onClick={(e)=>setAddingPlaylist(false)} size={'lg'} color={'#F59C24'} />
@@ -429,7 +430,7 @@ window.addEventListener('storage', (event) => {
                           ) : (
                             <Flex textAlign={'center'} align={'center'} gap={4}>
                               <FaSpotify color={'#1DB954'} size={28} />
-                              <Text fontSize={['md','md','2xl']}>
+                              <Text fontSize={['md','md','xl']}>
                                 Connect with Spotify
                               </Text>
                             </Flex>
@@ -516,7 +517,7 @@ window.addEventListener('storage', (event) => {
               )}
             </Flex>
           </Box>
-          <Box alignContent={'center'} overflow="hidden" textAlign={'center'} w={["100%","100%","30%","40%","40%"]}>
+          <Box display={['none','none','flex']} alignContent={'center'} overflow="hidden" textAlign={'center'} w={["0%","0%","30%","40%","40%"]}>
             <Stack
               display={currentAlbum ? 'flex' : 'none'}
               spacing={'48px'}
