@@ -264,7 +264,8 @@ window.addEventListener('storage', (event) => {
       <Box bgGradient="linear(to-r,#16032F, #000000)">
         <Flex wrap={['wrap','wrap','nowrap','nowrap','nowrap']} p={[6,6,12]} gap={48} direction={'row'}>
           <Box
-            h="100vh"
+            h="90vh"
+            maxH="90vh"
             overflow={'scroll'}
             gap={24}
             textAlign={'left'}
@@ -275,7 +276,7 @@ window.addEventListener('storage', (event) => {
             </Text>
             <VStack textAlign={'left'} marginTop={[10,10,16]} spacing={['54px','64px']}>
               <Text fontSize={['2xl','2xl','2xl','5xl','5xl']} fontWeight={'bold'} color="#FFFFFF">
-                Find soundtracks for your feels & remix w/ friends
+              Need new music? Give us a one-liner & we'll curate a mix for you 💿
               </Text>
               <Stack w={'100%'} spacing={4}>
                 <InputGroup border={'2px solid #FFFFFF'} borderRadius={48}>
@@ -327,9 +328,21 @@ window.addEventListener('storage', (event) => {
                 cursor={'pointer'}
                 fontWeight={'800'}
                 color="#AC91C1"
-                onClick={e => setPrompt('happy goofy in love')}
+                onClick={e => setPrompt('artists that sound like the weekend')}
               >
-                happy goofy in love
+                artists that sound like the weekend
+              </Text>
+              <Text
+                border={'2px solid #ffffff'}
+                borderRadius={'64px'}
+                fontSize={['sm','sm','xl','xl','xl']}
+                p={['14px','14px','18px']}
+                fontWeight={'800'}
+                cursor={'pointer'}
+                color="#AC91C1"
+                onClick={e => setPrompt('punjabi party vibes')}
+              >
+                punjabi party vibes
               </Text>
               <Text
                 border={'2px solid #ffffff'}
@@ -351,21 +364,9 @@ window.addEventListener('storage', (event) => {
                 fontWeight={'800'}
                 cursor={'pointer'}
                 color="#AC91C1"
-                onClick={e => setPrompt('prom night in highschool')}
+                onClick={e => setPrompt('indie songs to listen to on a roadtrip')}
               >
-                prom night in highschool
-              </Text>
-              <Text
-                border={'2px solid #ffffff'}
-                borderRadius={'64px'}
-                fontSize={['sm','sm','xl','xl','xl']}
-                p={['14px','14px','18px']}
-                fontWeight={'800'}
-                cursor={'pointer'}
-                color="#AC91C1"
-                onClick={e => setPrompt('full energy roadtrip feels')}
-              >
-                full energy roadtrip feels
+                indie songs to listen to on a roadtrip
               </Text>
             </Flex>
             <Flex marginTop={'4px'} marginBottom={'4px'}>
