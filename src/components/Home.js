@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import debounce from 'lodash.debounce';
+import { Helmet } from 'react-helmet';
 import {
   ChakraProvider,
   Box,
@@ -20,6 +22,10 @@ import {
   Spinner,
   Button,
   useDisclosure,
+  Select,
+  background,
+  Editable,
+  EditablePreview,
 } from '@chakra-ui/react';
 import {
   Modal,
@@ -31,12 +37,29 @@ import {
   ModalCloseButton,
 } from '@chakra-ui/react';
 import { ColorModeSwitcher } from '../ColorModeSwitcher.js';
-import { FaStopCircle, FaPlayCircle, FaSpotify } from 'react-icons/fa';
+import {
+  FaStopCircle,
+  FaPlayCircle,
+  FaSpotify,
+  FaChevronDown,
+  FaCross,
+  FaWindowClose,
+} from 'react-icons/fa';
 import { AiFillMinusCircle } from 'react-icons/ai';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 import { SpotifyAuth, Scopes } from 'react-spotify-auth';
+import {
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  MenuItemOption,
+  MenuGroup,
+  MenuOptionGroup,
+  MenuDivider,
+} from '@chakra-ui/react';
 
 function Home() {
   const [prompt, setPrompt] = useState('');
@@ -49,42 +72,68 @@ function Home() {
   const [currentTrack, setCurrentTrack] = useState([]);
   const [loggingIn, setloggingIn] = useState(false);
   const [currentAlbum, setCurrentAlbum] = useState(
-    'https://plus.unsplash.com/premium_photo-1682125488670-29e72e5a7672?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2788&q=80'
+    'https://images.unsplash.com/photo-1595177663993-4849619ab1f8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fHBsYXlsaXN0c3xlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60'
   );
   const [spotifyPlaylistId, setSpotifyPlaylistId] = useState(null);
 
   const [addingPlaylist, setAddingPlaylist] = useState(false);
 
-  const access_token = useSelector((state) => state.auth.access_token);
+  const access_token = useSelector(state => state.auth.access_token);
 
-  const [accessToken, setAccessToken] = useState(localStorage.getItem('access_token'))
+  const [accessToken, setAccessToken] = useState(
+    localStorage.getItem('access_token')
+  );
 
-  const [lastExecuted, setLastExecuted] = useState(null)
+  const [mode, setMode] = useState('Prompts');
+
+  const [lastExecuted, setLastExecuted] = useState(null);
 
   const [mixTitle, setMixTitle] = useState(null);
 
   const [loggedIn, setLoggedIn] = useState(false);
 
+  const [search, setSearch] = useState(null);
+
+  const [searchResults, setSearchResults] = useState([]);
+
+  const [selectedItems, setSelectedItems] = useState([]);
+
   let hasExecuted = false;
 
-  useEffect(() => {
+  const customScrollbarStyles: CSSObject = {
+    /* Hide scrollbar for webkit-based browsers (e.g., Chrome and Safari) */
+    /* Note: You may need to adjust the colors and styles to match your design */
+    "&::-webkit-scrollbar": {
+      width: "0em", /* Adjust the width as needed */
+    },
+  
+    "&::-webkit-scrollbar-thumb": {
+      backgroundColor: "transparent", /* Make the thumb transparent */
+    },
+  
+    /* Hide scrollbar for Firefox */
+    /* Note: This property may not be supported in all versions of Firefox */
+    scrollbarWidth: "thin", /* Adjust to 'none' or 'auto' as needed */
+  };
 
-    if (playlist.length>0){
+  useEffect(() => {
+    if (playlist.length > 0) {
       generatePlaylist(localStorage.getItem('access_token'));
     }
+  }, [loggedIn]);
 
-  },[loggedIn])
-  
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-window.addEventListener('storage', (event) => {
-    console.log('evnettt');
-    setLoggedIn(true);
-},{once:true});
-
-
+  window.addEventListener(
+    'storage',
+    event => {
+      console.log('evnettt');
+      setLoggedIn(true);
+    },
+    { once: true }
+  );
 
   const playlistAdded = () =>
     toast(
@@ -93,6 +142,14 @@ window.addEventListener('storage', (event) => {
         <Text>Your mix has been added to Spotify!</Text>
       </Flex>
     );
+  
+  const trackLimitHit = () =>
+    toast(
+      <Flex gap={2} textAlign={'center'} align={'center'}>
+        <FaCross color={'red'} />
+        <Text>You can only add upto 5 tracks/artists for inspiration!</Text>
+      </Flex>
+  );
 
   const handleLogin = () => {
     setAddingPlaylist(true);
@@ -102,7 +159,7 @@ window.addEventListener('storage', (event) => {
     }
 
     const clientId = '9cf715547e7245ab8b2154081eeab4cf';
-    const redirectUri = 'https://mixes.musixspace.com/auth';
+    const redirectUri = 'http://localhost:3000/auth';
     const scope = [
       'user-read-private user-read-email',
       'playlist-modify-public',
@@ -113,8 +170,65 @@ window.addEventListener('storage', (event) => {
     );
   };
 
+  const searchFromSpotify = () => {
+    axios
+      .post(
+        `http://localhost:5000/search`,
+        {
+          q: search,
+          type: mode === 'Similar Tracks' ? 'tracks' : 'artists',
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json', // Specify that the request body is JSON
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      )
+      .then(response => {
+        console.log('search result', response.data);
+        if (mode === 'Similar Tracks' && search.length > 0) {
+          const trackInfo = [];
+          response.data.results.tracks.items.map(track =>
+            trackInfo.push({
+              name: track.name,
+              uri: track.uri,
+              img_url: track.album.images[0].url,
+            })
+          );
+          setSearchResults(trackInfo);
+          console.log('searchTracks', searchResults);
+        } else if (mode === 'Similar Artists' && search.length > 0) {
+          const artistInfo = [];
+          response.data.results.artists.items.map(artist =>
+            artistInfo.push({
+              name: artist.name,
+              img_url: artist.images[0].url || null,
+              uri: artist.uri,
+            })
+          );
+          setSearchResults(artistInfo);
+          console.log('searchArtists', searchResults);
+        }
+      })
+      .catch(err => {
+        console.log('error in fetching data', err);
+      });
+  };
+
+  // useEffect(() => {
+  //   searchFromSpotify(search);
+  // }, [search]);
+
+  const debouncedSearch = e => (searchFromSpotify(), 3000); // Adjust the delay (in milliseconds) as needed
+
+  useEffect(() => {
+    if (mode !== 'Prompts' & selectedItems.length > 0)
+    generateMix();
+  }, [selectedItems]);
+
   const generatePlaylist = token => {
-      axios
+    axios
       .get('https://api.spotify.com/v1/me', {
         headers: {
           'Content-Type': 'application/json', // Specify that the request body is JSON
@@ -122,34 +236,33 @@ window.addEventListener('storage', (event) => {
         },
       })
       .then(response => {
-
         axios
-        .post(
-          `https://mixes.data.musixspace.com/info`,
-          {
-            name: response.data.display_name,
-            id: response.data.id,
-            email: response.data.email || null,
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json', // Specify that the request body is JSON
-              'Access-Control-Allow-Origin': '*',
+          .post(
+            `http://localhost:5000/info`,
+            {
+              name: response.data.display_name,
+              id: response.data.id,
+              email: response.data.email || null,
             },
-          }
-        )
-        .then(response => {
-          console.log('user info stored');
-        })
-        .catch(err => {
-          console.log('error in fetching data');
-        });
+            {
+              headers: {
+                'Content-Type': 'application/json', // Specify that the request body is JSON
+                'Access-Control-Allow-Origin': '*',
+              },
+            }
+          )
+          .then(response => {
+            console.log('user info stored');
+          })
+          .catch(err => {
+            console.log('error in fetching data');
+          });
 
         axios
           .post(
             `https://api.spotify.com/v1/users/${response.data.id}/playlists`,
             {
-              name: prompt,
+              name: mixTitle,
               public: true,
               description: 'created using mixes.musixspace.com',
             },
@@ -191,8 +304,8 @@ window.addEventListener('storage', (event) => {
       })
       .catch(err => {
         if (err.response && err.response.status === 401) {
-            localStorage.clear('access_token');
-            handleLogin()
+          localStorage.clear('access_token');
+          handleLogin();
         }
       });
   };
@@ -200,46 +313,80 @@ window.addEventListener('storage', (event) => {
   const generateMix = () => {
     setLoadingMix(true);
     setSpotifyPlaylistId(null);
-    setMixTitle(prompt);
+    toggleAudio(currentTrack,currentIndex)
     setCurrentTrack(null);
-    axios
-      .post(
-        'https://mixes.data.musixspace.com/',
-        {
-          prompt: prompt,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json', // Specify that the request body is JSON
-            'Access-Control-Allow-Origin': '*',
+
+    if (mode === 'Prompts') {
+      setMixTitle(prompt);
+      axios
+        .post(
+          'http://localhost:5000/',
+          {
+            prompt: prompt,
           },
-        }
-      )
-      .then(response => {
-        setPlaylist(response.data.results);
-        setLoadingMix(false);
-        setCurrentAlbum(response.data.results[0].img_url);
-        setCurrentTrack(response.data.results[0])
-        setCurrentIndex(0);
-      })
-      .catch(err => {
-        setLoadingMix(false);
-      });
+          {
+            headers: {
+              'Content-Type': 'application/json', // Specify that the request body is JSON
+              'Access-Control-Allow-Origin': '*',
+            },
+          }
+        )
+        .then(response => {
+          setPlaylist(response.data.results);
+          setLoadingMix(false);
+          setCurrentAlbum(response.data.results[0].img_url);
+          setCurrentTrack(response.data.results[0]);
+          setCurrentIndex(0);
+          setAudioPlaying(false);
+        })
+        .catch(err => {
+          setLoadingMix(false);
+        });
+    } else {
+      const title = selectedItems.map((obj) => obj.name).join(", ");
+      setMixTitle(`music similar to ${title}`);
+      axios
+        .post(
+          'http://localhost:5000/recs',
+          {
+            uris : selectedItems.map((item) => item.uri)
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json', // Specify that the request body is JSON
+              'Access-Control-Allow-Origin': '*',
+            },
+          }
+        )
+        .then(response => {
+          console.log('recs',response.data)
+          setPlaylist(response.data.results);
+          setLoadingMix(false);
+          setCurrentAlbum(response.data.results[0].img_url);
+          setCurrentTrack(response.data.results[0]);
+          setCurrentIndex(0);
+        })
+        .catch(err => {
+          setLoadingMix(false);
+        });
+    }
   };
 
-  window.addEventListener("ended", (event) => { console.log('stopped');setAudioPlaying(false)});
+  window.addEventListener('ended', event => {
+    console.log('stopped');
+    setAudioPlaying(false);
+  });
 
   const toggleAudio = (track, idx) => {
     setCurrentAlbum(track.img_url);
     setCurrentTrack(track);
     var audio_element = document.getElementsByClassName('current-playing')[0];
-    if (currentIndex === idx){
+    if (currentIndex === idx) {
       setCurrentIndex(idx);
       audio_element.src = track.preview_url;
       audioPlaying ? audio_element.pause() : audio_element.play();
       setAudioPlaying(!audioPlaying);
-    }
-    else{
+    } else {
       setCurrentIndex(idx);
       audio_element.src = track.preview_url;
       audio_element.play();
@@ -261,38 +408,137 @@ window.addEventListener('storage', (event) => {
           },
         }}
       />
+      <Helmet>
+        <meta charSet="utf-8" />
+        <title>Mixes - music for any moment!</title>
+        <link rel="canonical" href="http://mysite.com/example" />
+      </Helmet>
       <Box bgGradient="linear(to-r,#16032F, #000000)">
-        <Flex wrap={['wrap','wrap','nowrap','nowrap','nowrap']} p={[6,6,12]} gap={48} direction={'row'}>
+        <Flex
+          wrap={['wrap', 'wrap', 'nowrap', 'nowrap', 'nowrap']}
+          p={[6, 6, 12]}
+          gap={48}
+          direction={'row'}
+          position={'relative'}
+        >
           <Box
-            h="90vh"
-            maxH="90vh"
+            h="95vh"
+            maxH="95vh"
             overflow={'scroll'}
+            css={customScrollbarStyles}
+            
             gap={24}
             textAlign={'left'}
-            w={["100%","100%","70%","60%","60%"]}
+            w={['100%', '100%', '100%', '60%', '60%']}
           >
-            <Text fontSize={['3xl','3xl','3xl','6xl','6xl']} fontWeight={'800'} color="#F59C24">
+            <Text
+              fontSize={['3xl', '3xl', '3xl', '6xl', '6xl']}
+              fontWeight={'800'}
+              color="#F59C24"
+            >
               Mixes
             </Text>
-            <VStack textAlign={'left'} marginTop={[10,10,16]} spacing={['54px','64px']}>
-              <Text fontSize={['2xl','2xl','2xl','5xl','5xl']} fontWeight={'bold'} color="#FFFFFF">
-              Need new music? Give us a one-liner & we'll curate a mix for you 💿
+            <VStack
+              textAlign={'left'}
+              marginTop={[10, 10, 16]}
+              spacing={['54px', '64px']}
+            >
+              <Text
+                fontSize={['2xl', '2xl', '2xl', '5xl', '5xl']}
+                fontWeight={'bold'}
+                color="#FFFFFF"
+              >
+                Need new music? Give us a one-liner & we'll curate a mix for you
+                💿
               </Text>
               <Stack w={'100%'} spacing={4}>
-                <InputGroup border={'2px solid #FFFFFF'} borderRadius={48}>
-                  <Input
-                    onChange={e => setPrompt(e.target.value)}
-                    value={prompt}
-                    focusBorderColor={'transperant'}
-                    border={'transparent'}
-                    borderRadius={48}
-                    w={'100%'}
-                    fontWeight={'700'}
-                    textColor={'#F59C24'}
-                    fontSize={['lg','lg','2xl','2xl','2xl']}
-                    p={[6,6,8]}
-                    placeholder="Enter your moment here"
-                  />
+                <InputGroup
+                  border={'2px solid #FFFFFF'}
+                  alignContent={'center'}
+                  borderRadius={48}
+                >
+                  {/* <Button marginLeft={'12px'} alignSelf={'center'} fontSize={'md'} paddingTop={'15px'} paddingBottom={'15px'} paddingLeft={'22px'} paddingRight={'22px'}   borderRadius={'3xl'} backgroundColor={'#D9D9D9'}> */}
+                  <Menu>
+                    <MenuButton
+                      marginLeft={['6px','6px','12px']}
+                      alignSelf={'center'}
+                      fontSize={['xs','xs','md']}
+                      borderRadius={'3xl'}
+                      backgroundColor={'#D9D9D9'}
+                      as={Button}
+                      justifyContent={'space-betweeen'}
+                      gap={[16,16,24,24,24]}
+                      w={['110%','110%','auto']}
+                      minW={['25%','auto','15%']}
+                      rightIcon={<FaChevronDown />}
+                    >
+                      {mode}
+                    </MenuButton>
+                    <MenuList>
+                      <MenuItem
+                        fontSize={['sm','sm','md']}
+                        onClick={e => {
+                          setSelectedItems([]);
+                          setMode('Prompts');
+                        }}
+                      >
+                        Prompts
+                      </MenuItem>
+                      <MenuItem
+                      fontSize={['sm','sm','md']}
+                        onClick={e => {
+                          setSearch('');
+                          setMode('Similar Artists');
+                        }}
+                      >
+                        Similar Artists
+                      </MenuItem>
+                      <MenuItem
+                      fontSize={['sm','sm','md']}
+                        onClick={e => {
+                          setSearch('');
+                          setMode('Similar Tracks');
+                        }}
+                      >
+                        Similar Tracks
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
+                  {/* </Button> */}
+                  {mode === 'Prompts' ? (
+                    <Input
+                      onChange={e => setPrompt(e.target.value)}
+                      value={prompt}
+                      focusBorderColor={'transperant'}
+                      border={'transparent'}
+                      borderRadius={48}
+                      w={'100%'}
+                      fontWeight={'700'}
+                      textColor={'#F59C24'}
+                      fontSize={['lg', 'lg', '2xl', '2xl', '2xl']}
+                      p={[6, 6, 8]}
+                      placeholder="Enter your moment here"
+                    />
+                  ) : (
+                    <>
+                      <Input
+                        onChange={e => {
+                          setSearch(e.target.value);
+                          debouncedSearch(e.target.value);
+                        }}
+                        value={search}
+                        focusBorderColor={'transperant'}
+                        border={'transparent'}
+                        borderRadius={48}
+                        w={'100%'}
+                        fontWeight={'700'}
+                        textColor={'#F59C24'}
+                        fontSize={['lg', 'lg', '2xl', '2xl', '2xl']}
+                        p={[6, 6, 8]}
+                        placeholder="Search for your artists/tracks"
+                      />
+                    </>
+                  )}
                   <InputRightAddon
                     _hover={{ pointerEvents: 'drag' }}
                     alignSelf={'center'}
@@ -312,21 +558,126 @@ window.addEventListener('storage', (event) => {
                   </InputRightAddon>
                 </InputGroup>
               </Stack>
+              {search && search.length > 0 && (
+                <Flex
+                  position={'absolute'}
+                  direction={'column'}
+                  textAlign={'left'}
+                  alignContent={'flex-start'}
+                  backgroundColor={'#282828'}
+                  marginTop={['14em', '12em','13rem','17.5em']}
+                  w={['90%','90%',"48%"]}
+                  h="auto"
+                  maxH={'35vh'}
+                  overflow={'scroll'}
+                  zIndex={9999}
+                  borderRadius={12}
+                >
+                  {searchResults.map(item => (
+                    <Flex
+                      textAlign={'left'}
+                      alignItems={'left'}
+                      gap={[7,14]}
+                      direction={'row'}
+                      cursor="pointer"
+                      _hover={{ bg: 'black' }}
+                      p={4}
+                      onClick={e => {
+                        setSearch('');
+                        if (selectedItems.length <= 5){
+                          setSelectedItems(selectedItems => [
+                            ...selectedItems,
+                            item,
+                          ]);
+                        }
+                        else{
+
+                        }
+                      }}
+                    >
+                      <Image
+                        borderRadius={48}
+                        float={'left'}
+                        h={[12]}
+                        w={[12]}
+                        src={item.img_url}
+                      />
+                      <Text
+                        fontWeight={'600'}
+                        alignSelf={'center'}
+                        fontSize={['sm','sm','lg']}
+                        color="#fff"
+                      >
+                        {item.name}
+                      </Text>
+                    </Flex>
+                  ))}
+                </Flex>
+              )}
             </VStack>
+            <Flex
+              gap={[2,4]}
+              alignItems={'center'}
+              w="auto"
+              direction={'row'}
+              wrap="wrap"
+            >
+              {selectedItems.length > 0 &&
+                selectedItems.map(item => (
+                  <Flex
+                    p={[2,2,2]}
+                    borderRadius={48}
+                    border="2px solid white"
+                    marginTop={'12px'}
+                    align={'center'}
+                    fontSize={['sm','sm','md']}
+                    alignContent={'center'}
+                    textAlign={'center'}
+                    gap={[1,1,4]}
+                    direction={'row'}
+                  >
+                    <Image
+                      height={8}
+                      width={8}
+                      borderRadius={36}
+                      src={item.img_url}
+                    />
+                    <Text fontWeight={'600'} alignSelf={'center'} color="#fff">
+                      {item.name}
+                    </Text>
+                    <AiFillMinusCircle
+                      onClick={e =>
+                        setSelectedItems(selectedItems =>
+                          selectedItems.filter(pitem => pitem.uri !== item.uri)
+                        )
+                      }
+                      size={24}
+                      color="#fff"
+                    />
+                  </Flex>
+                ))}
+            </Flex>
             <Flex
               flexWrap={'wrap'}
               direction={'row'}
               gap={'24px'}
               marginTop={'24px'}
-              display={playlist && playlist.length < 1 & !loadingMix ? 'flex' : 'none'}
+              zIndex={1}
+              display={
+                playlist &&
+                (playlist.length < 1) & !loadingMix &&
+                selectedItems.length < 1
+                  ? 'flex'
+                  : 'none'
+              }
             >
               <Text
                 border={'2px solid #ffffff'}
                 borderRadius={'64px'}
-                fontSize={['sm','sm','xl','xl','xl']}
-                p={['14px','14px','18px']}
+                fontSize={['xs', 'xs', 'xl', 'xl', 'xl']}
+                p={['14px', '14px', '18px']}
                 cursor={'pointer'}
-                fontWeight={'800'}
+                fontWeight={'700'}
                 color="#AC91C1"
                 onClick={e => setPrompt('artists that sound like the weekend')}
               >
@@ -335,9 +686,9 @@ window.addEventListener('storage', (event) => {
               <Text
                 border={'2px solid #ffffff'}
                 borderRadius={'64px'}
-                fontSize={['sm','sm','xl','xl','xl']}
-                p={['14px','14px','18px']}
-                fontWeight={'800'}
+                fontSize={['xs', 'xs', 'xl', 'xl', 'xl']}
+                p={['14px', '14px', '18px']}
+                fontWeight={'700'}
                 cursor={'pointer'}
                 color="#AC91C1"
                 onClick={e => setPrompt('punjabi party vibes')}
@@ -347,9 +698,9 @@ window.addEventListener('storage', (event) => {
               <Text
                 border={'2px solid #ffffff'}
                 borderRadius={'64px'}
-                fontSize={['sm','sm','xl','xl','xl']}
-                p={['14px','14px','18px']}
-                fontWeight={'800'}
+                fontSize={['xs', 'xs', 'xl', 'xl', 'xl']}
+                p={['14px', '14px', '18px']}
+                fontWeight={'700'}
                 cursor={'pointer'}
                 color="#AC91C1"
                 onClick={e => setPrompt('head banging rock like nirvana')}
@@ -359,12 +710,14 @@ window.addEventListener('storage', (event) => {
               <Text
                 border={'2px solid #ffffff'}
                 borderRadius={'64px'}
-                fontSize={['sm','sm','xl','xl','xl']}
-                p={['14px','14px','18px']}
-                fontWeight={'800'}
+                fontSize={['xs', 'xs', 'xl', 'xl', 'xl']}
+                p={['14px', '14px', '18px']}
+                fontWeight={'700'}
                 cursor={'pointer'}
                 color="#AC91C1"
-                onClick={e => setPrompt('indie songs to listen to on a roadtrip')}
+                onClick={e =>
+                  setPrompt('indie songs to listen to on a roadtrip')
+                }
               >
                 indie songs to listen to on a roadtrip
               </Text>
@@ -373,7 +726,7 @@ window.addEventListener('storage', (event) => {
               <Text
                 marginTop={'48px'}
                 marginBottom={'24px'}
-                fontSize={['xl','xl','2xl','2xl','2xl']}
+                fontSize={['xl', 'xl', '2xl', '2xl', '2xl']}
                 fontWeight={'bold'}
                 color="#FFFFFF"
                 display={playlist && playlist.length > 0 ? 'block' : 'none'}
@@ -387,17 +740,37 @@ window.addEventListener('storage', (event) => {
                     marginTop={[2]}
                   >
                     <Flex textAlign={'center'} gap={2}>
-                      <Text fontSize={['md','md','lg','lg','lg']}>Open in Spotify</Text>
+                      <Text fontSize={['md', 'md', 'lg', 'lg', 'lg']}>
+                        Open in Spotify
+                      </Text>
                       <FaSpotify color={'#1DB954'} size={22} />
                     </Flex>
                   </Button>
                 ) : (
-                  <Button marginTop={[2]} isDisabled = { loadingMix ? true : false} onClick={localStorage.getItem('access_token') ? (()=> {setAddingPlaylist(true);generatePlaylist(localStorage.getItem('access_token'))}) : onOpen} borderRadius={'24px'}>
+                  <Button
+                    marginTop={[2]}
+                    isDisabled={loadingMix ? true : false}
+                    onClick={
+                      localStorage.getItem('access_token')
+                        ? () => {
+                            setAddingPlaylist(true);
+                            generatePlaylist(
+                              localStorage.getItem('access_token')
+                            );
+                          }
+                        : onOpen
+                    }
+                    borderRadius={'24px'}
+                  >
                     <Flex textAlign={'center'} gap={2}>
-                      {addingPlaylist ? <Spinner/> : (
+                      {addingPlaylist ? (
+                        <Spinner />
+                      ) : (
                         <>
-                        <Text fontSize={['md','md','lg','lg','lg']}>Add to Spotify</Text>
-                        <FaSpotify color={'#1DB954'} size={22} />
+                          <Text fontSize={['md', 'md', 'lg', 'lg', 'lg']}>
+                            Add to Spotify
+                          </Text>
+                          <FaSpotify color={'#1DB954'} size={22} />
                         </>
                       )}
                     </Flex>
@@ -406,11 +779,15 @@ window.addEventListener('storage', (event) => {
                 <Modal size={'md'} isOpen={isOpen} onClose={onClose}>
                   <ModalOverlay backdropFilter="blur(10px)" />
                   <ModalContent
-                    width={['100%','100%','50%']}
-                    h={['40%','40%','30%']}
+                    width={['100%', '100%', '50%']}
+                    h={['40%', '40%', '30%']}
                     bgGradient="linear(to-r,#16032F, #000000)"
                   >
-                    <ModalCloseButton onClick={(e)=>setAddingPlaylist(false)} size={'lg'} color={'#F59C24'} />
+                    <ModalCloseButton
+                      onClick={e => setAddingPlaylist(false)}
+                      size={'lg'}
+                      color={'#F59C24'}
+                    />
                     <ModalBody
                       borderRadius={24}
                       border={'2px solid #ffffff'}
@@ -423,11 +800,14 @@ window.addEventListener('storage', (event) => {
                         align={'center'}
                         textAlign={'center'}
                       >
-                        <Image filter = {loadingMix ? 'blur(8px)' : null} src={currentTrack && currentTrack.img_url} />
+                        <Image
+                          filter={loadingMix ? 'blur(8px)' : null}
+                          src={currentTrack && currentTrack.img_url}
+                        />
                         <Text
                           color={'#F59C24'}
                           w="100%"
-                          fontSize={['lg','lg','2xl']}
+                          fontSize={['lg', 'lg', '2xl']}
                           fontWeight={'700'}
                         >
                           Connect your Spotify
@@ -435,14 +815,14 @@ window.addEventListener('storage', (event) => {
                         <Text
                           color={'#ffffff'}
                           w="100%"
-                          fontSize={['md','md','xl']}
+                          fontSize={['md', 'md', 'xl']}
                           fontWeight={'500'}
                         >
                           Connect your Spotify account to add this mix to your
                           library!
                         </Text>
                         <Button
-                          className='connect-spotify'
+                          className="connect-spotify"
                           onClick={handleLogin}
                           marginTop={'12px'}
                           padding={'32px'}
@@ -454,7 +834,7 @@ window.addEventListener('storage', (event) => {
                           ) : (
                             <Flex textAlign={'center'} align={'center'} gap={4}>
                               <FaSpotify color={'#1DB954'} size={28} />
-                              <Text fontSize={['md','md','xl']}>
+                              <Text fontSize={['md', 'md', 'xl']}>
                                 Connect with Spotify
                               </Text>
                             </Flex>
@@ -477,8 +857,16 @@ window.addEventListener('storage', (event) => {
                   paddingTop={'sm'}
                   marginTop={12}
                 >
-                  <Spinner thickness="4px" size={['lg','lg','xl','xl','xl']}color="#F59C24" />
-                  <Text fontWeight={'600'} color={'#fff'} fontSize={['lg','lg','2xl','2xl','2xl']}>
+                  <Spinner
+                    thickness="4px"
+                    size={['lg', 'lg', 'xl', 'xl', 'xl']}
+                    color="#F59C24"
+                  />
+                  <Text
+                    fontWeight={'600'}
+                    color={'#fff'}
+                    fontSize={['lg', 'lg', '2xl', '2xl', '2xl']}
+                  >
                     Generating your mix..
                   </Text>
                 </Flex>
@@ -494,16 +882,15 @@ window.addEventListener('storage', (event) => {
                     />
                     <Flex direction={'column'} align={'left'}>
                       <Text
-                        fontSize={['16px','16px','18px']}
+                        fontSize={['16px', '16px', '18px']}
                         fontWeight={'700'}
                         color="#AC91C1"
-
                       >
                         {' '}
                         {track.name}
                       </Text>
                       <Text
-                        fontSize={['12px','12px','14px']}
+                        fontSize={['12px', '12px', '14px']}
                         fontStyle={'italic'}
                         fontWeight={'700'}
                         color="#FFFFFF"
@@ -541,7 +928,13 @@ window.addEventListener('storage', (event) => {
               )}
             </Flex>
           </Box>
-          <Box display={['none','none','flex']} alignContent={'center'} overflow="hidden" textAlign={'center'} w={["0%","0%","30%","40%","40%"]}>
+          <Box
+            display={['none', 'none', 'flex']}
+            alignContent={'center'}
+            overflow="hidden"
+            textAlign={'center'}
+            w={['0%', '0%', '30%', '40%', '40%']}
+          >
             <Stack
               display={currentAlbum ? 'flex' : 'none'}
               spacing={'48px'}
@@ -554,8 +947,9 @@ window.addEventListener('storage', (event) => {
                 objectFit={'cover'}
                 border={'2px solid #F59C24'}
                 borderRadius={20}
-                height='auto'
-                width='auto'
+                height="auto"
+                maxH={'70vh'}
+                width="auto"
                 src={currentAlbum}
                 alt="Dan Abramov"
               />
