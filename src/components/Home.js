@@ -512,7 +512,7 @@ function Home() {
                     justifyContent={'space-betweeen'}
                     gap={[16, 16, 24, 24, 24]}
                     w={['auto']}
-                    maxW={['40vw', '35vw', '22vw', '10vw']}
+                    maxW={['40vw', '35vw', '22vw', '12vw']}
                     rightIcon={<FaChevronDown />}
                   >
                     {mode}
