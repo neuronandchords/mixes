@@ -369,7 +369,7 @@ function Home() {
         .post(
           'https://mixes.data.musixspace.com/recs',
           {
-            title: mixTitle,
+            title: `music similar to ${title}`,
             uris: selectedItems.map(item => item.uri),
           },
           {
