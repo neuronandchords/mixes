@@ -159,7 +159,7 @@ function Home() {
     }
 
     const clientId = '9cf715547e7245ab8b2154081eeab4cf';
-    const redirectUri = 'http://localhost:3000/auth';
+    const redirectUri = 'https://mixes.musixspace.com/auth';
     const scope = [
       'user-read-private user-read-email',
       'playlist-modify-public',
@@ -173,7 +173,7 @@ function Home() {
   const searchFromSpotify = () => {
     axios
       .post(
-        `http://localhost:5000/search`,
+        `https://mixes.data.musixspace.com/search`,
         {
           q: search,
           type: mode === 'Similar Tracks' ? 'tracks' : 'artists',
@@ -238,7 +238,7 @@ function Home() {
       .then(response => {
         axios
           .post(
-            `http://localhost:5000/info`,
+            `https://mixes.data.musixspace.com/info`,
             {
               name: response.data.display_name,
               id: response.data.id,
@@ -320,7 +320,7 @@ function Home() {
       setMixTitle(prompt);
       axios
         .post(
-          'http://localhost:5000/',
+          'https://mixes.data.musixspace.com/',
           {
             prompt: prompt,
           },
@@ -347,7 +347,7 @@ function Home() {
       setMixTitle(`music similar to ${title}`);
       axios
         .post(
-          'http://localhost:5000/recs',
+          'https://mixes.data.musixspace.com/recs',
           {
             uris : selectedItems.map((item) => item.uri)
           },
