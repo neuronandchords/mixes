@@ -179,7 +179,7 @@ function Home() {
   const searchFromSpotify = () => {
     axios
       .post(
-        `https://mixes.data.musixspace.com//search`,
+        `https://mixes.data.musixspace.com/search`,
         {
           q: search,
           type: mode === 'Similar Tracks' ? 'tracks' : 'artists',
@@ -246,7 +246,7 @@ function Home() {
       .then(response => {
         axios
           .post(
-            `https://mixes.data.musixspace.com//info`,
+            `https://mixes.data.musixspace.com/info`,
             {
               name: response.data.display_name,
               id: response.data.id,
@@ -337,7 +337,7 @@ function Home() {
       setMixTitle(prompt);
       axios
         .post(
-          'https://mixes.data.musixspace.com//',
+          'https://mixes.data.musixspace.com/',
           {
             prompt: prompt,
           },
@@ -367,8 +367,9 @@ function Home() {
       setMixTitle(`music similar to ${title}`);
       axios
         .post(
-          'https://mixes.data.musixspace.com//recs',
+          'https://mixes.data.musixspace.com/recs',
           {
+            title: mixTitle,
             uris: selectedItems.map(item => item.uri),
           },
           {
