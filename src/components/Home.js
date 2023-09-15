@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import debounce from 'lodash.debounce';
 import { Helmet } from 'react-helmet';
 import {
@@ -44,8 +44,9 @@ import {
   FaChevronDown,
   FaCross,
   FaWindowClose,
+  FaAudioDescription,
 } from 'react-icons/fa';
-import { AiFillMinusCircle } from 'react-icons/ai';
+import { AiFillMinusCircle, AiFillCloseCircle } from 'react-icons/ai';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { useSelector } from 'react-redux';
@@ -98,22 +99,26 @@ function Home() {
 
   const [selectedItems, setSelectedItems] = useState([]);
 
+  const [isDropOpen, setIsDropOpen] = useState(false);
+
+  const boxRef = useRef(null);
+
   let hasExecuted = false;
 
   const customScrollbarStyles: CSSObject = {
     /* Hide scrollbar for webkit-based browsers (e.g., Chrome and Safari) */
     /* Note: You may need to adjust the colors and styles to match your design */
-    "&::-webkit-scrollbar": {
-      width: "0em", /* Adjust the width as needed */
+    '&::-webkit-scrollbar': {
+      width: '0em' /* Adjust the width as needed */,
     },
-  
-    "&::-webkit-scrollbar-thumb": {
-      backgroundColor: "transparent", /* Make the thumb transparent */
+
+    '&::-webkit-scrollbar-thumb': {
+      backgroundColor: 'transparent' /* Make the thumb transparent */,
     },
-  
+
     /* Hide scrollbar for Firefox */
     /* Note: This property may not be supported in all versions of Firefox */
-    scrollbarWidth: "thin", /* Adjust to 'none' or 'auto' as needed */
+    scrollbarWidth: 'thin' /* Adjust to 'none' or 'auto' as needed */,
   };
 
   useEffect(() => {
@@ -129,7 +134,6 @@ function Home() {
   window.addEventListener(
     'storage',
     event => {
-      console.log('evnettt');
       setLoggedIn(true);
     },
     { once: true }
@@ -142,14 +146,16 @@ function Home() {
         <Text>Your mix has been added to Spotify!</Text>
       </Flex>
     );
-  
+
   const trackLimitHit = () =>
     toast(
-      <Flex gap={2} textAlign={'center'} align={'center'}>
-        <FaCross color={'red'} />
-        <Text>You can only add upto 5 tracks/artists for inspiration!</Text>
+      <Flex gap={6} textAlign={'left'} align={'center'}>
+        <AiFillCloseCircle size={[26]} color={'red'} />
+        <Text fontSize={['sm', 'sm', 'md']}>
+          You can only add upto 5 tracks/artists for inspiration!
+        </Text>
       </Flex>
-  );
+    );
 
   const handleLogin = () => {
     setAddingPlaylist(true);
@@ -173,7 +179,7 @@ function Home() {
   const searchFromSpotify = () => {
     axios
       .post(
-        `https://mixes.data.musixspace.com/search`,
+        `https://mixes.data.musixspace.com//search`,
         {
           q: search,
           type: mode === 'Similar Tracks' ? 'tracks' : 'artists',
@@ -186,7 +192,6 @@ function Home() {
         }
       )
       .then(response => {
-        console.log('search result', response.data);
         if (mode === 'Similar Tracks' && search.length > 0) {
           const trackInfo = [];
           response.data.results.tracks.items.map(track =>
@@ -197,22 +202,26 @@ function Home() {
             })
           );
           setSearchResults(trackInfo);
-          console.log('searchTracks', searchResults);
+          setIsDropOpen(true);
         } else if (mode === 'Similar Artists' && search.length > 0) {
           const artistInfo = [];
           response.data.results.artists.items.map(artist =>
             artistInfo.push({
               name: artist.name,
-              img_url: artist.images[0].url || null,
+              img_url:
+                (artist && artist.images.length > 0 && artist.images[0].url) ||
+                null,
               uri: artist.uri,
             })
           );
           setSearchResults(artistInfo);
-          console.log('searchArtists', searchResults);
+          setIsDropOpen(true);
         }
       })
       .catch(err => {
-        console.log('error in fetching data', err);
+        toast.error(
+          'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+        );
       });
   };
 
@@ -223,8 +232,7 @@ function Home() {
   const debouncedSearch = e => (searchFromSpotify(), 3000); // Adjust the delay (in milliseconds) as needed
 
   useEffect(() => {
-    if (mode !== 'Prompts' & selectedItems.length > 0)
-    generateMix();
+    if ((mode !== 'Prompts') & (selectedItems.length > 0)) generateMix();
   }, [selectedItems]);
 
   const generatePlaylist = token => {
@@ -238,7 +246,7 @@ function Home() {
       .then(response => {
         axios
           .post(
-            `https://mixes.data.musixspace.com/info`,
+            `https://mixes.data.musixspace.com//info`,
             {
               name: response.data.display_name,
               id: response.data.id,
@@ -252,10 +260,11 @@ function Home() {
             }
           )
           .then(response => {
-            console.log('user info stored');
           })
           .catch(err => {
-            console.log('error in fetching data');
+            toast.error(
+              'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+            );
           });
 
         axios
@@ -295,17 +304,25 @@ function Home() {
                 onClose();
               })
               .catch(err => {
-                console.log('error in fetching data');
+                toast.error(
+                  'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+                );
               });
           })
           .catch(err => {
-            console.log('error in fetching data');
+            toast.error(
+              'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+            );
           });
       })
       .catch(err => {
         if (err.response && err.response.status === 401) {
           localStorage.clear('access_token');
           handleLogin();
+        } else {
+          toast.error(
+            'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+          );
         }
       });
   };
@@ -313,14 +330,14 @@ function Home() {
   const generateMix = () => {
     setLoadingMix(true);
     setSpotifyPlaylistId(null);
-    toggleAudio(currentTrack,currentIndex)
+    pauseAudio();
     setCurrentTrack(null);
 
     if (mode === 'Prompts') {
       setMixTitle(prompt);
       axios
         .post(
-          'https://mixes.data.musixspace.com/',
+          'https://mixes.data.musixspace.com//',
           {
             prompt: prompt,
           },
@@ -336,20 +353,23 @@ function Home() {
           setLoadingMix(false);
           setCurrentAlbum(response.data.results[0].img_url);
           setCurrentTrack(response.data.results[0]);
-          setCurrentIndex(0);
+          setCurrentIndex(null);
           setAudioPlaying(false);
         })
         .catch(err => {
+          toast.error(
+            'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+          );
           setLoadingMix(false);
         });
     } else {
-      const title = selectedItems.map((obj) => obj.name).join(", ");
+      const title = selectedItems.map(obj => obj.name).join(', ');
       setMixTitle(`music similar to ${title}`);
       axios
         .post(
-          'https://mixes.data.musixspace.com/recs',
+          'https://mixes.data.musixspace.com//recs',
           {
-            uris : selectedItems.map((item) => item.uri)
+            uris: selectedItems.map(item => item.uri),
           },
           {
             headers: {
@@ -359,23 +379,42 @@ function Home() {
           }
         )
         .then(response => {
-          console.log('recs',response.data)
           setPlaylist(response.data.results);
           setLoadingMix(false);
           setCurrentAlbum(response.data.results[0].img_url);
           setCurrentTrack(response.data.results[0]);
-          setCurrentIndex(0);
+          setCurrentIndex(null);
+          setAudioPlaying(false);
         })
         .catch(err => {
+          toast.error(
+            'Whoops! Our DJ got tangled in cables. Please give it another go! 🎧'
+          );
           setLoadingMix(false);
         });
     }
   };
 
   window.addEventListener('ended', event => {
-    console.log('stopped');
     setAudioPlaying(false);
   });
+
+  const handleBoxClick = () => {
+    setIsDropOpen(!isDropOpen);
+  };
+
+  const handleOutsideClick = (event) => {
+    if (boxRef.current && !boxRef.current.contains(event.target)) {
+      setIsDropOpen(!false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, []);
 
   const toggleAudio = (track, idx) => {
     setCurrentAlbum(track.img_url);
@@ -394,6 +433,11 @@ function Home() {
     }
   };
 
+  const pauseAudio = state => {
+    var audio_element = document.getElementsByClassName('current-playing')[0];
+    audio_element.pause();
+  };
+
   return (
     <ChakraProvider theme={theme}>
       <Toaster
@@ -410,7 +454,7 @@ function Home() {
       />
       <Helmet>
         <meta charSet="utf-8" />
-        <title>Mixes - music for any moment!</title>
+        <title>Mixes - Music for any moment!</title>
         <link rel="canonical" href="http://mysite.com/example" />
       </Helmet>
       <Box bgGradient="linear(to-r,#16032F, #000000)">
@@ -424,20 +468,22 @@ function Home() {
           <Box
             h="95vh"
             maxH="95vh"
+            position={'relative'}
             overflow={'scroll'}
             css={customScrollbarStyles}
-            
             gap={24}
             textAlign={'left'}
             w={['100%', '100%', '100%', '60%', '60%']}
           >
-            <Text
-              fontSize={['3xl', '3xl', '3xl', '6xl', '6xl']}
-              fontWeight={'800'}
-              color="#F59C24"
-            >
-              Mixes
-            </Text>
+            <Flex gap={0} direction={'row'}>
+              <Text
+                fontSize={['3xl', '3xl', '3xl', '6xl', '6xl']}
+                fontWeight={'800'}
+                color="#F59C24"
+              >
+                Mixes
+              </Text>
+            </Flex>
             <VStack
               textAlign={'left'}
               marginTop={[10, 10, 16]}
@@ -452,58 +498,61 @@ function Home() {
                 💿
               </Text>
               <Stack w={'100%'} spacing={4}>
+                <Menu>
+                  <MenuButton
+                    marginLeft={['6px', '6px', '12px']}
+                    alignSelf={'left'}
+                    fontSize={['xs', 'xs', 'lg']}
+                    borderRadius={'3xl'}
+                    backgroundColor={'#D9D9D9'}
+                    as={Button}
+                    pt={6}
+                    pb={6}
+                    onClick={e => setIsDropOpen(false)}
+                    justifyContent={'space-betweeen'}
+                    gap={[16, 16, 24, 24, 24]}
+                    w={['auto']}
+                    maxW={['40vw', '35vw', '22vw', '10vw']}
+                    rightIcon={<FaChevronDown />}
+                  >
+                    {mode}
+                  </MenuButton>
+                  <MenuList>
+                    <MenuItem
+                      fontSize={['sm', 'sm', 'lg']}
+                      onClick={e => {
+                        setSelectedItems([]);
+                        setMode('Prompts');
+                      }}
+                    >
+                      Prompts
+                    </MenuItem>
+                    <MenuItem
+                      fontSize={['sm', 'sm', 'lg']}
+                      onClick={e => {
+                        setSearch('');
+                        setMode('Similar Artists');
+                      }}
+                    >
+                      Similar Artists
+                    </MenuItem>
+                    <MenuItem
+                      fontSize={['sm', 'sm', 'lg']}
+                      onClick={e => {
+                        setSearch('');
+                        setMode('Similar Tracks');
+                      }}
+                    >
+                      Similar Tracks
+                    </MenuItem>
+                  </MenuList>
+                </Menu>
                 <InputGroup
                   border={'2px solid #FFFFFF'}
                   alignContent={'center'}
                   borderRadius={48}
                 >
                   {/* <Button marginLeft={'12px'} alignSelf={'center'} fontSize={'md'} paddingTop={'15px'} paddingBottom={'15px'} paddingLeft={'22px'} paddingRight={'22px'}   borderRadius={'3xl'} backgroundColor={'#D9D9D9'}> */}
-                  <Menu>
-                    <MenuButton
-                      marginLeft={['6px','6px','12px']}
-                      alignSelf={'center'}
-                      fontSize={['xs','xs','md']}
-                      borderRadius={'3xl'}
-                      backgroundColor={'#D9D9D9'}
-                      as={Button}
-                      justifyContent={'space-betweeen'}
-                      gap={[16,16,24,24,24]}
-                      w={['110%','110%','auto']}
-                      minW={['25%','auto','15%']}
-                      rightIcon={<FaChevronDown />}
-                    >
-                      {mode}
-                    </MenuButton>
-                    <MenuList>
-                      <MenuItem
-                        fontSize={['sm','sm','md']}
-                        onClick={e => {
-                          setSelectedItems([]);
-                          setMode('Prompts');
-                        }}
-                      >
-                        Prompts
-                      </MenuItem>
-                      <MenuItem
-                      fontSize={['sm','sm','md']}
-                        onClick={e => {
-                          setSearch('');
-                          setMode('Similar Artists');
-                        }}
-                      >
-                        Similar Artists
-                      </MenuItem>
-                      <MenuItem
-                      fontSize={['sm','sm','md']}
-                        onClick={e => {
-                          setSearch('');
-                          setMode('Similar Tracks');
-                        }}
-                      >
-                        Similar Tracks
-                      </MenuItem>
-                    </MenuList>
-                  </Menu>
                   {/* </Button> */}
                   {mode === 'Prompts' ? (
                     <Input
@@ -515,7 +564,7 @@ function Home() {
                       w={'100%'}
                       fontWeight={'700'}
                       textColor={'#F59C24'}
-                      fontSize={['lg', 'lg', '2xl', '2xl', '2xl']}
+                      fontSize={['md', 'md', '2xl', '2xl', '2xl']}
                       p={[6, 6, 8]}
                       placeholder="Enter your moment here"
                     />
@@ -533,7 +582,7 @@ function Home() {
                         w={'100%'}
                         fontWeight={'700'}
                         textColor={'#F59C24'}
-                        fontSize={['lg', 'lg', '2xl', '2xl', '2xl']}
+                        fontSize={['md', 'md', '2xl', '2xl', '2xl']}
                         p={[6, 6, 8]}
                         placeholder="Search for your artists/tracks"
                       />
@@ -558,65 +607,83 @@ function Home() {
                   </InputRightAddon>
                 </InputGroup>
               </Stack>
-              {search && search.length > 0 && (
-                <Flex
+              {search && search.length && isDropOpen > 0 && (
+                <>
+                  <Box
+                    position="absolute"
+                    zIndex={9}
+                    // mt={["calc(80% + 4px)","calc(90% + 4px)","calc(64% + 4px)","calc(42% + 4px)"]}
+                    marginTop={['17.2em', '12em', '16.75rem', '21rem']}
+                    width="100%"
+                    boxShadow="lg"
+                    borderRadius="lg"
+                    maxH="230px"
+                    overflowY="auto"
+                    backgroundColor={'#282828'}
+                    ref={boxRef}
+                    onClick={(e)=>handleBoxClick()}
+                  >
+                    {/* <Flex
                   position={'absolute'}
                   direction={'column'}
                   textAlign={'left'}
                   alignContent={'flex-start'}
                   backgroundColor={'#282828'}
-                  marginTop={['14em', '12em','13rem','17.5em']}
-                  w={['90%','90%',"48%"]}
+                  marginTop={['14em', '12em', '13rem', '17.5em']}
+                  w={['90%', '90%', '48%']}
                   h="auto"
                   maxH={'35vh'}
                   overflow={'scroll'}
                   zIndex={9999}
                   borderRadius={12}
-                >
-                  {searchResults.map(item => (
-                    <Flex
-                      textAlign={'left'}
-                      alignItems={'left'}
-                      gap={[7,14]}
-                      direction={'row'}
-                      cursor="pointer"
-                      _hover={{ bg: 'black' }}
-                      p={4}
-                      onClick={e => {
-                        setSearch('');
-                        if (selectedItems.length <= 5){
-                          setSelectedItems(selectedItems => [
-                            ...selectedItems,
-                            item,
-                          ]);
-                        }
-                        else{
-
-                        }
-                      }}
-                    >
-                      <Image
-                        borderRadius={48}
-                        float={'left'}
-                        h={[12]}
-                        w={[12]}
-                        src={item.img_url}
-                      />
-                      <Text
-                        fontWeight={'600'}
-                        alignSelf={'center'}
-                        fontSize={['sm','sm','lg']}
-                        color="#fff"
+                > */}
+                    {searchResults.map(item => (
+                      <Flex
+                        textAlign={'left'}
+                        alignItems={'left'}
+                        gap={[7, 14]}
+                        direction={'row'}
+                        cursor="pointer"
+                        _hover={{ bg: 'black' }}
+                        p={4}
+                        onClick={e => {
+                          setSearch('');
+                          if (selectedItems.length <= 4) {
+                            setSelectedItems(selectedItems => [
+                              ...selectedItems,
+                              item,
+                            ]);
+                          } else {
+                            toast.error(
+                              'Umm, our DJ can only take up to 5 tracks/artists as inspiration! 🎧'
+                            );
+                          }
+                        }}
                       >
-                        {item.name}
-                      </Text>
-                    </Flex>
-                  ))}
-                </Flex>
+                        <Image
+                          borderRadius={48}
+                          float={'left'}
+                          h={[12]}
+                          w={[12]}
+                          src={item.img_url}
+                        />
+                        <Text
+                          fontWeight={'600'}
+                          alignSelf={'center'}
+                          fontSize={['sm', 'sm', 'lg']}
+                          color="#fff"
+                        >
+                          {item.name}
+                        </Text>
+                      </Flex>
+                    ))}
+                    {/* </Flex> */}
+                  </Box>
+                </>
               )}
             </VStack>
             <Flex
-              gap={[2,4]}
+              gap={[2, 4]}
               alignItems={'center'}
               w="auto"
               direction={'row'}
@@ -625,20 +692,20 @@ function Home() {
               {selectedItems.length > 0 &&
                 selectedItems.map(item => (
                   <Flex
-                    p={[2,2,2]}
+                    p={[2, 2, 2]}
                     borderRadius={48}
                     border="2px solid white"
                     marginTop={'12px'}
                     align={'center'}
-                    fontSize={['sm','sm','md']}
+                    fontSize={['xs', 'xs', 'md']}
                     alignContent={'center'}
                     textAlign={'center'}
-                    gap={[1,1,4]}
+                    gap={[1, 1, 4]}
                     direction={'row'}
                   >
                     <Image
-                      height={8}
-                      width={8}
+                      height={[6, 6, 8]}
+                      width={[6, 6, 8]}
                       borderRadius={36}
                       src={item.img_url}
                     />
@@ -660,7 +727,7 @@ function Home() {
             <Flex
               flexWrap={'wrap'}
               direction={'row'}
-              gap={'24px'}
+              gap={['12px', '12px', '24px']}
               marginTop={'24px'}
               zIndex={1}
               display={
@@ -846,7 +913,7 @@ function Home() {
                 </Modal>
               </Text>
             </Flex>
-            <Flex gap={8} direction={'column'}>
+            <Flex gap={4} direction={'column'}>
               {loadingMix ? (
                 <Flex
                   direction={'column'}
@@ -873,18 +940,29 @@ function Home() {
               ) : (
                 playlist &&
                 playlist.map((track, idx) => (
-                  <HStack gap={6} align={'left'}>
+                  <HStack
+                    p={4}
+                    gap={6}
+                    align={'left'}
+                    borderRadius={6}
+                    backgroundColor={idx === currentIndex ? 'black' : 'none'}
+                  >
                     <Image
                       borderRadius={4}
                       height={'64px'}
                       width={'64px'}
+                      cursor={'pointer'}
                       src={track.img_url}
+                      onClick={e => window.open(track.href)}
                     />
                     <Flex direction={'column'} align={'left'}>
                       <Text
                         fontSize={['16px', '16px', '18px']}
                         fontWeight={'700'}
                         color="#AC91C1"
+                        cursor={'pointer'}
+                        _hover={{ textDecoration: 'underline' }}
+                        onClick={e => window.open(track.href)}
                       >
                         {' '}
                         {track.name}
